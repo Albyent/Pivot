@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Settings
+import android.view.ContextThemeWrapper
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -73,6 +74,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.habitlog.LogViewModel
 import app.habitlog.model.DayState
+import app.habitlog.model.HabitColor
 import app.habitlog.model.HabitHistory
 import app.habitlog.model.MIN_DAY
 import app.habitlog.model.asDate
@@ -105,11 +107,14 @@ fun PivotApp(model: LogViewModel) {
     val now by model.now.collectAsStateWithLifecycle()
     val requested by model.requestedHabit.collectAsStateWithLifecycle()
     val pendingBackup by model.pendingBackup.collectAsStateWithLifecycle()
+    val accent by model.accent.collectAsStateWithLifecycle()
     val data = snapshot
     val context = LocalContext.current
+    val pickerContext = remember(context, accent) { ContextThemeWrapper(context, accent.pickerStyle) }
     var tab by rememberSaveable { mutableStateOf(Tab.Dashboard) }
     var selectedHabit by rememberSaveable { mutableStateOf<Long?>(null) }
     var settings by rememberSaveable { mutableStateOf(false) }
+    var showingThemePicker by rememberSaveable { mutableStateOf(false) }
     var todayOnly by rememberSaveable { mutableStateOf(false) }
     var sheet by remember { mutableStateOf<Sheet?>(null) }
     var confirm by remember { mutableStateOf<Confirm?>(null) }
@@ -119,7 +124,7 @@ fun PivotApp(model: LogViewModel) {
 
     fun openEntry(id: Long, day: Long) { sheet = Sheet.Entry(id, day) }
     fun pauseHabit(id: Long) {
-        chooseDate(context, now + 7, now, now + 3650) { last ->
+        chooseDate(pickerContext, now + 7, now, now + 3650) { last ->
             model.write("Habit paused") { pause(id, last) }
         }
     }
@@ -165,7 +170,7 @@ fun PivotApp(model: LogViewModel) {
         if (granted) model.refreshDevice() else model.message("Enable notifications in Android settings for reminders.")
     }
 
-    PivotTheme {
+    PivotTheme(accent) {
         Scaffold(
             containerColor = Ink.background,
             contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -223,12 +228,14 @@ fun PivotApp(model: LogViewModel) {
                             HabitDetails(detail, now, contextLine, { openEntry(id, it) }, {
                                 val latest = minOf(now, archived ?: now)
                                 if (latest >= detail.habit.startDay) {
-                                    chooseDate(context, latest, detail.habit.startDay, latest) { openEntry(id, it) }
+                                    chooseDate(pickerContext, latest, detail.habit.startDay, latest) { openEntry(id, it) }
                                 }
                             })
                         }
                         settings -> SettingsScreen(
                             data,
+                            accent.label,
+                            onTheme = { showingThemePicker = true },
                             onExport = { exportFile.launch("pivot-backup-${now.asDate()}.json") },
                             onRestore = { importFile.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) },
                             onWidget = {
@@ -276,7 +283,9 @@ fun PivotApp(model: LogViewModel) {
                     when (openSheet) {
                         is Sheet.HabitForm -> {
                             val history = data.histories.find { it.habit.id == openSheet.id }
-                            HabitEditor(history, now, data.habits.size % habitColors.size) { draft ->
+                            val palette = HabitColor.suggestedOrder
+                            val suggestedColor = palette[data.habits.size % palette.size].id
+                            HabitEditor(history, now, suggestedColor, pickerContext) { draft ->
                                 model.write { saveHabit(openSheet.id, draft) }
                                 sheet = null
                                 if (draft.reminderMinute != null && Build.VERSION.SDK_INT >= 33 &&
@@ -287,7 +296,7 @@ fun PivotApp(model: LogViewModel) {
                         }
                         is Sheet.TaskForm -> {
                             val task = data.tasks.find { it.id == openSheet.id }
-                            TaskEditor(task, now, onSave = { name, date ->
+                            TaskEditor(task, now, pickerContext, onSave = { name, date ->
                                 model.write { saveTask(openSheet.id, name, date) }
                                 sheet = null
                             }, onDelete = {
@@ -306,12 +315,14 @@ fun PivotApp(model: LogViewModel) {
                             }
                         }
                         is Sheet.Activity -> DayOverview(data, openSheet.day, now, onPick = {
-                            chooseDate(context, openSheet.day, MIN_DAY, now) { sheet = Sheet.Activity(it) }
+                            chooseDate(pickerContext, openSheet.day, MIN_DAY, now) { sheet = Sheet.Activity(it) }
                         }) { id -> openEntry(id, openSheet.day) }
                     }
                 }
             }
         }
+
+        if (showingThemePicker) ThemePicker(accent, model::selectAccent) { showingThemePicker = false }
 
         confirm?.let { action ->
             val title: String
@@ -398,7 +409,7 @@ private fun BottomNavigation(current: Tab, onTab: (Tab) -> Unit) {
                         verticalArrangement = Arrangement.Center,
                     ) {
                         Box(Modifier.size(42.dp, 26.dp).background(
-                            if (active) Color(0xFF353055) else Color.Transparent, RoundedCornerShape(8.dp)),
+                            if (active) Ink.selectedSurface else Color.Transparent, RoundedCornerShape(8.dp)),
                             contentAlignment = Alignment.Center) {
                             Icon(tab.icon, null, Modifier.size(19.dp), tint = if (active) Ink.primary else Ink.muted)
                         }

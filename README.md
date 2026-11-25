@@ -18,6 +18,7 @@ The debug APK is `app/build/outputs/apk/debug/app-debug.apk`. The signed APK use
 
 ## Using Pivot
 
+- In the habit editor, pick a color or search for an icon. Open **Settings → App theme** to set the overall accent.
 - Tap a habit’s check button to log today. Hold a completed checkmark to clear the check-in. Tap a heatmap cell to view or edit a dated entry.
 - Open a habit and use its options menu to edit, skip, pause, reorder, or archive it. Hold a pending check button for quick access to check-in options.
 - Weekly goals count distinct completed days from Monday through Sunday. Amount goals can use quick-add increments. Notes belong to a habit and a date.

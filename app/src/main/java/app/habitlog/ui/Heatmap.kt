@@ -51,7 +51,7 @@ internal fun habitCell(state: DayState, color: Color): Cell = when (state) {
     DayState.INACTIVE, DayState.FUTURE -> Cell(Color(0xFF202B3C))
 }
 
-internal fun activityCell(count: Int, day: Long, now: Long): Cell {
+internal fun activityCell(count: Int, day: Long, now: Long, accent: Color): Cell {
     if (day > now) return Cell(Color(0xFF202B3C))
     val level = when (count) {
         0 -> 0f
@@ -60,7 +60,7 @@ internal fun activityCell(count: Int, day: Long, now: Long): Cell {
         3 -> 0.80f
         else -> 1f
     }
-    return Cell(lerp(Color(0xFF2A364C), Ink.graph, level), outlined = day == now)
+    return Cell(lerp(Color(0xFF2A364C), accent, level), outlined = day == now)
 }
 
 @Composable
@@ -72,6 +72,7 @@ internal fun Heatmap(
     compact: Boolean = false,
     onVisibleDates: ((Long, Long) -> Unit)? = null,
 ) {
+    val outlineColor = Ink.primary.copy(alpha = 0.75f)
     val lastWeek = weekStart(now)
     val columns = 53
     val first = lastWeek - (columns - 1) * 7
@@ -147,7 +148,7 @@ internal fun Heatmap(
                         val corners = CornerRadius(radius)
                         drawRoundRect(mark.color, point, square, corners)
                         if (mark.outlined) {
-                            drawRoundRect(Ink.primary.copy(alpha = 0.75f), point, square, corners, style = Stroke(1.2.dp.toPx()))
+                            drawRoundRect(outlineColor, point, square, corners, style = Stroke(1.2.dp.toPx()))
                         }
                         if (mark.skipped) {
                             drawLine(Ink.dim, Offset(x + tile * 0.31f, y + tile * 0.69f),

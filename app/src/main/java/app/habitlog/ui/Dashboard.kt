@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import app.habitlog.data.LogSnapshot
 import app.habitlog.data.Schedule
 import app.habitlog.model.DayState
+import app.habitlog.model.HabitColor
 import app.habitlog.model.HabitHistory
 import app.habitlog.model.amountLabel
 import app.habitlog.model.dayLabel
@@ -147,6 +148,7 @@ internal fun Dashboard(
 
 @Composable
 private fun ActivityCard(snapshot: LogSnapshot, now: Long, onDay: (Long) -> Unit) {
+    val accent = Ink.graph
     val activity = remember(snapshot, now) {
         snapshot.histories.asSequence().flatMap { history ->
             history.entries.keys.asSequence().filter { history.completedOn(it, now) }
@@ -157,7 +159,7 @@ private fun ActivityCard(snapshot: LogSnapshot, now: Long, onDay: (Long) -> Unit
     val period = remember(activity, first, last) { activity.filterKeys { it in first..last } }
     Panel {
         Column(Modifier.padding(start = 15.dp, end = 15.dp, top = 13.dp, bottom = 13.dp)) {
-            Heatmap(now, { day -> activityCell(activity[day] ?: 0, day, now) }, onDay,
+            Heatmap(now, { day -> activityCell(activity[day] ?: 0, day, now, accent) }, onDay,
                 onVisibleDates = { from, through -> first = from; last = through })
             Spacer(Modifier.height(10.dp))
             HorizontalDivider(color = Ink.border)
@@ -188,7 +190,7 @@ private fun HabitCard(
     onResume: () -> Unit,
 ) {
     val habit = history.habit
-    val color = habitColors.getOrElse(habit.color) { Ink.primary }
+    val color = HabitColor.fromId(habit.color).tint
     val schedule = history.scheduleAt(now)
     val progress = remember(history, now) { history.weeklyProgress(now, now) }
     val streak = remember(history, now) { history.streaks(now) }

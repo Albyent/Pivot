@@ -3,7 +3,9 @@ package app.habitlog.data
 import android.content.Context
 import androidx.room.withTransaction
 import app.habitlog.model.DayState
+import app.habitlog.model.HabitColor
 import app.habitlog.model.HabitHistory
+import app.habitlog.model.HabitIcon
 import app.habitlog.model.MIN_DAY
 import app.habitlog.model.today
 import app.habitlog.model.weekStart
@@ -39,6 +41,7 @@ class LogRepository(context: Context) {
         val previous = snapshot.histories.find { it.habit.id == id }
         val name = draft.name.trim()
         require(name.isNotEmpty() && name.length <= 80)
+        require(HabitColor.containsId(draft.color) && HabitIcon.containsId(draft.icon))
         require(draft.startDay in MIN_DAY..day)
         val validSchedule = draft.schedule.weeklyTarget?.let { it in 1..7 } ?: (draft.schedule.weekdays in 1..127)
         require(validSchedule)

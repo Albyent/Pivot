@@ -27,6 +27,7 @@ import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.FileUpload
 import androidx.compose.material.icons.outlined.NotificationsNone
+import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.automirrored.outlined.StickyNote2
 import androidx.compose.material.icons.outlined.Widgets
 import androidx.compose.material3.Checkbox
@@ -55,6 +56,7 @@ import androidx.compose.ui.unit.dp
 import app.habitlog.data.CheckIn
 import app.habitlog.data.LogSnapshot
 import app.habitlog.data.Task
+import app.habitlog.model.HabitColor
 import app.habitlog.model.HabitHistory
 import app.habitlog.model.amountLabel
 import app.habitlog.model.dayLabel
@@ -71,7 +73,7 @@ internal fun HabitDetails(
     onDatePicker: () -> Unit,
 ) {
     val habit = history.habit
-    val accent = habitColors.getOrElse(habit.color) { Ink.primary }
+    val accent = HabitColor.fromId(habit.color).tint
     val streak = remember(history, now) { history.streaks(now) }
     var range by rememberSaveable(habit.id) { mutableIntStateOf(30) }
     var notesOnly by rememberSaveable(habit.id) { mutableStateOf(false) }
@@ -312,6 +314,8 @@ private fun TaskRow(task: Task, now: Long, onEdit: () -> Unit, onToggle: () -> U
 @Composable
 internal fun SettingsScreen(
     snapshot: LogSnapshot,
+    themeLabel: String,
+    onTheme: () -> Unit,
     onExport: () -> Unit,
     onRestore: () -> Unit,
     onWidget: () -> Unit,
@@ -320,6 +324,11 @@ internal fun SettingsScreen(
 ) {
     val archived = snapshot.histories.filter { it.habit.archivedDay != null }
     LazyColumn(contentPadding = screenPadding, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        item {
+            Panel {
+                DetailRow("App theme", themeLabel, icon = Icons.Outlined.Palette, onClick = onTheme)
+            }
+        }
         item {
             Panel {
                 Column {

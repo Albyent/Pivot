@@ -20,6 +20,7 @@ import androidx.lifecycle.viewModelScope
 import app.habitlog.data.LocalBackup
 import app.habitlog.data.LogRepository
 import app.habitlog.data.LogSnapshot
+import app.habitlog.model.AppAccent
 import app.habitlog.model.today
 import app.habitlog.system.DeviceFeatures
 import app.habitlog.ui.PivotApp
@@ -28,6 +29,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -91,6 +93,8 @@ class LogViewModel(private val application: Application) : AndroidViewModel(appl
     private val repository = LogRepository(application)
     val state = repository.snapshots.stateIn(viewModelScope, SharingStarted.Eagerly, null)
     val now = MutableStateFlow(today())
+    private val selectedAccent = MutableStateFlow(AppAccent.load(application))
+    val accent = selectedAccent.asStateFlow()
     val requestedHabit = MutableStateFlow<Long?>(null)
     val pendingBackup = MutableStateFlow<LogSnapshot?>(null)
     private val messageChannel = Channel<Feedback>(Channel.BUFFERED)
@@ -132,6 +136,13 @@ class LogViewModel(private val application: Application) : AndroidViewModel(appl
         val snapshot = pendingBackup.value ?: return
         pendingBackup.value = null
         write("Backup restored") { restore(snapshot) }
+    }
+
+    fun selectAccent(accent: AppAccent) {
+        if (selectedAccent.value == accent) return
+        accent.save(application)
+        selectedAccent.value = accent
+        refreshDevice()
     }
 
     fun refreshDevice() {

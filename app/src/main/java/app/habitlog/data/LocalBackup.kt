@@ -2,6 +2,8 @@ package app.habitlog.data
 
 import android.content.Context
 import android.net.Uri
+import app.habitlog.model.HabitColor
+import app.habitlog.model.HabitIcon
 import app.habitlog.model.MAX_DAY
 import app.habitlog.model.MIN_DAY
 import kotlinx.coroutines.Dispatchers
@@ -57,7 +59,7 @@ object LocalBackup {
         require(document.getString("format") == "pivot-habits" && document.getInt("version") == 1)
         val habits = document.list("habits") {
             Habit(getLong("id").checked { it > 0 }, getString("name").checked { it.isNotBlank() && it.length <= 80 },
-                getInt("color").checked { it in 0..7 }, getInt("icon").checked { it in 0..7 },
+                getInt("color").checked { HabitColor.containsId(it) }, getInt("icon").checked { HabitIcon.containsId(it) },
                 getLong("startDay").day(), getInt("position").checked { it in 0..1_000_000 },
                 longOrNull("archivedDay")?.day(), intOrNull("reminderMinute")?.checked { it in 0..1439 })
         }

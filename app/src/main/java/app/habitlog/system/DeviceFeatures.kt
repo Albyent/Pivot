@@ -23,6 +23,7 @@ import app.habitlog.MainActivity
 import app.habitlog.R
 import app.habitlog.data.LogRepository
 import app.habitlog.data.LogSnapshot
+import app.habitlog.model.AppAccent
 import app.habitlog.model.DayState
 import app.habitlog.model.HabitHistory
 import app.habitlog.model.amountLabel
@@ -111,6 +112,7 @@ object DeviceFeatures {
         val rowIds = intArrayOf(R.id.widget_row_1, R.id.widget_row_2, R.id.widget_row_3)
         val names = intArrayOf(R.id.widget_name_1, R.id.widget_name_2, R.id.widget_name_3)
         val checks = intArrayOf(R.id.widget_check_1, R.id.widget_check_2, R.id.widget_check_3)
+        val accent = context.getColor(AppAccent.load(context).colorRes)
         val active = snapshot.histories.filter { it.habit.archivedDay == null }
         val visible = (active.filter { it.isDue(date) } +
             active.filter { it.dayState(date, date) == DayState.DONE }).take(rowIds.size)
@@ -132,6 +134,7 @@ object DeviceFeatures {
             views.setTextViewText(names[index], habit.name)
             views.setOnClickPendingIntent(names[index], openApp(context, habit.id))
             views.setTextViewText(checks[index], label)
+            views.setTextColor(checks[index], accent)
             views.setContentDescription(checks[index], if (done) "Undo ${habit.name}" else "Log ${habit.name}")
             val intent = Intent(context, HabitWidget::class.java).setAction(CHECK)
                 .setData("pivot://widget/${habit.id}/$date/$done".toUri())

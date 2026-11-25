@@ -25,7 +25,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CalendarToday
-import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.NotificationsNone
 import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material3.Button
@@ -43,7 +42,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -52,7 +50,9 @@ import androidx.compose.ui.unit.dp
 import app.habitlog.data.HabitDraft
 import app.habitlog.data.Schedule
 import app.habitlog.data.Task
+import app.habitlog.model.HabitColor
 import app.habitlog.model.HabitHistory
+import app.habitlog.model.HabitIcon
 import app.habitlog.model.MIN_DAY
 import app.habitlog.model.asDate
 import app.habitlog.model.dayLabel
@@ -89,14 +89,15 @@ internal fun HabitEditor(
     history: HabitHistory?,
     now: Long,
     suggestedColor: Int,
+    pickerContext: Context,
     onSave: (HabitDraft) -> Unit,
 ) {
-    val context = LocalContext.current
     val habit = history?.habit
     val initial = history?.schedules?.lastOrNull() ?: Schedule()
     var name by rememberSaveable { mutableStateOf(habit?.name.orEmpty()) }
     var color by rememberSaveable { mutableStateOf(habit?.color ?: suggestedColor) }
     var icon by rememberSaveable { mutableStateOf(habit?.icon ?: 0) }
+    var pickingIcon by rememberSaveable { mutableStateOf(false) }
     var start by rememberSaveable { mutableStateOf(habit?.startDay ?: now) }
     var mode by rememberSaveable {
         mutableStateOf(if (initial.weeklyTarget != null) 2 else if (initial.weekdays == 127) 0 else 1)
@@ -113,6 +114,12 @@ internal fun HabitEditor(
     val validNumeric = !numeric || parsedGoal != null && parsedGoal in 0.01..1_000_000.0 &&
         parsedQuick != null && parsedQuick in 0.01..1_000_000.0
     val validSchedule = mode != 1 || weekdays != 0
+    if (pickingIcon) {
+        IconPicker(HabitIcon.fromId(icon), HabitColor.fromId(color).tint, onClose = { pickingIcon = false }) {
+            icon = it.id
+        }
+        return
+    }
     EditorContent(if (habit == null) "New habit" else "Edit habit") {
         OutlinedTextField(name, { if (it.length <= 80) name = it }, Modifier.fillMaxWidth(),
             label = { Text("Habit name") }, singleLine = true)
@@ -150,7 +157,7 @@ internal fun HabitEditor(
         }
         if (habit == null) {
             ActionPill("Starts " + dayLabel(start, "MMM d"), {
-                chooseDate(context, start, MIN_DAY, now) { start = it }
+                chooseDate(pickerContext, start, MIN_DAY, now) { start = it }
             }, icon = Icons.Outlined.CalendarToday)
         }
         SwitchRow("Track an amount", numeric) { numeric = it }
@@ -168,38 +175,16 @@ internal fun HabitEditor(
         }
         SwitchRow("Reminder", reminder != null) { reminder = if (it) 8 * 60 else null }
         reminder?.let { minute ->
-            ActionPill(timeLabel(context, minute), {
-                TimePickerDialog(context, { _, hour, mins -> reminder = hour * 60 + mins },
-                    minute / 60, minute % 60, DateFormat.is24HourFormat(context)).show()
+            ActionPill(timeLabel(pickerContext, minute), {
+                TimePickerDialog(pickerContext, { _, hour, mins -> reminder = hour * 60 + mins },
+                    minute / 60, minute % 60, DateFormat.is24HourFormat(pickerContext)).show()
             }, icon = Icons.Outlined.NotificationsNone)
         }
-        Text("Color", style = MaterialTheme.typography.titleSmall)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            habitColors.forEachIndexed { index, tint ->
-                Box(
-                    Modifier.size(34.dp).clip(CircleShape).background(tint.copy(alpha = 0.22f))
-                        .border(if (color == index) 2.dp else 1.dp, tint, CircleShape)
-                        .semantics { contentDescription = colorNames[index] }
-                        .selectable(color == index, role = Role.RadioButton, onClick = { color = index }),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    if (color == index) Icon(Icons.Outlined.Check, null, Modifier.size(17.dp), tint = tint)
-                }
-            }
-        }
-        Text("Icon", style = MaterialTheme.typography.titleSmall)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            habitIcons.forEachIndexed { index, glyph ->
-                val tint = if (icon == index) habitColors[color] else Ink.muted
-                Box(Modifier.size(34.dp).clip(CircleShape).background(Ink.recessed)
-                    .border(1.dp, if (icon == index) tint else Ink.border, CircleShape)
-                    .semantics { contentDescription = iconNames[index] }
-                    .selectable(icon == index, role = Role.RadioButton, onClick = { icon = index }),
-                    contentAlignment = Alignment.Center) {
-                    Icon(glyph, null, Modifier.size(19.dp), tint = tint)
-                }
-            }
-        }
+        HabitAppearanceControls(
+            HabitColor.fromId(color), HabitIcon.fromId(icon),
+            onColor = { color = it.id },
+            onPickIcon = { pickingIcon = true },
+        )
         Button(
             onClick = {
                 val schedule = Schedule(
@@ -268,8 +253,13 @@ internal fun EntryEditor(
 }
 
 @Composable
-internal fun TaskEditor(task: Task?, now: Long, onSave: (String, Long?) -> Unit, onDelete: () -> Unit) {
-    val context = LocalContext.current
+internal fun TaskEditor(
+    task: Task?,
+    now: Long,
+    pickerContext: Context,
+    onSave: (String, Long?) -> Unit,
+    onDelete: () -> Unit,
+) {
     var name by rememberSaveable { mutableStateOf(task?.name.orEmpty()) }
     var due by rememberSaveable { mutableStateOf(task?.dueDay) }
     EditorContent(if (task == null) "New task" else "Edit task") {
@@ -278,7 +268,7 @@ internal fun TaskEditor(task: Task?, now: Long, onSave: (String, Long?) -> Unit,
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically) {
             ActionPill(due?.let { dayLabel(it) } ?: "Add due date", {
-                chooseDate(context, due ?: now, MIN_DAY, now + 36_525) { due = it }
+                chooseDate(pickerContext, due ?: now, MIN_DAY, now + 36_525) { due = it }
             }, icon = Icons.Outlined.CalendarToday)
             if (due != null) TextButton(onClick = { due = null }) { Text("Clear date") }
         }
