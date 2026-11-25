@@ -19,10 +19,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.ChevronRight
@@ -31,7 +30,6 @@ import androidx.compose.material.icons.outlined.FilterList
 import androidx.compose.material.icons.outlined.LocalFireDepartment
 import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.automirrored.outlined.StickyNote2
-import androidx.compose.material.icons.outlined.TrackChanges
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -48,7 +46,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -93,16 +91,10 @@ internal fun Dashboard(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item(key = "activity") {
-            Column {
-                SectionTitle("Activity", Icons.Outlined.BarChart) {
-                    ActionPill("Today", { onDay(now) }, icon = Icons.Outlined.CalendarToday)
-                }
-                Spacer(Modifier.height(5.dp))
-                ActivityCard(snapshot, now, onDay)
-            }
+            ActivityCard(snapshot, now, onDay)
         }
         item(key = "habit-controls") {
-            SectionTitle("Habits", Icons.Outlined.TrackChanges) {
+            SectionTitle("Habits") {
                 if (active.isNotEmpty()) {
                     ActionPill(
                         if (todayOnly) "Due today" else "${due.size} due",
@@ -111,18 +103,15 @@ internal fun Dashboard(
                         active = todayOnly,
                     )
                 }
-                CircleAction(Icons.Outlined.Add, "New habit", onAdd)
+                ToolbarAction(Icons.Outlined.Add, "New habit", onAdd)
             }
         }
         if (active.isEmpty()) {
             item(key = "empty-habits") {
                 Panel {
                     Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Start with one habit", style = MaterialTheme.typography.titleMedium)
-                        Text("Pick something you’d like to do regularly.", color = Ink.muted,
-                            style = MaterialTheme.typography.bodyMedium)
-                        Spacer(Modifier.height(2.dp))
-                        Button(onClick = onAdd) { Text("Create a habit") }
+                        Text("No habits yet", style = MaterialTheme.typography.titleMedium)
+                        Button(onClick = onAdd, shape = MaterialTheme.shapes.small) { Text("Create a habit") }
                     }
                 }
             }
@@ -148,6 +137,7 @@ internal fun Dashboard(
 
 @Composable
 private fun ActivityCard(snapshot: LogSnapshot, now: Long, onDay: (Long) -> Unit) {
+    val colors = MaterialTheme.colorScheme
     val accent = Ink.graph
     val activity = remember(snapshot, now) {
         snapshot.histories.asSequence().flatMap { history ->
@@ -159,7 +149,11 @@ private fun ActivityCard(snapshot: LogSnapshot, now: Long, onDay: (Long) -> Unit
     val period = remember(activity, first, last) { activity.filterKeys { it in first..last } }
     Panel {
         Column(Modifier.padding(start = 15.dp, end = 15.dp, top = 13.dp, bottom = 13.dp)) {
-            Heatmap(now, { day -> activityCell(activity[day] ?: 0, day, now, accent) }, onDay,
+            SectionTitle("Activity") {
+                ActionPill("Today", { onDay(now) }, icon = Icons.Outlined.CalendarToday)
+            }
+            Spacer(Modifier.height(7.dp))
+            Heatmap(now, { day -> activityCell(activity[day] ?: 0, day, now, accent, colors) }, onDay,
                 onVisibleDates = { from, through -> first = from; last = through })
             Spacer(Modifier.height(10.dp))
             HorizontalDivider(color = Ink.border)
@@ -190,7 +184,11 @@ private fun HabitCard(
     onResume: () -> Unit,
 ) {
     val habit = history.habit
-    val color = HabitColor.fromId(habit.color).tint
+    val swatch = HabitColor.fromId(habit.color).tint
+    val color = habitInk(swatch)
+    val colors = MaterialTheme.colorScheme
+    val chartColor = colors.habitGraphColor(swatch)
+    val checkShape = MaterialTheme.shapes.small
     val schedule = history.scheduleAt(now)
     val progress = remember(history, now) { history.weeklyProgress(now, now) }
     val streak = remember(history, now) { history.streaks(now) }
@@ -207,12 +205,12 @@ private fun HabitCard(
         Column(Modifier.padding(start = 15.dp, end = 15.dp, top = 13.dp, bottom = 13.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Row(
-                    Modifier.weight(1f).heightIn(min = 49.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                    Modifier.weight(1f).heightIn(min = 49.dp).clip(RoundedCornerShape(8.dp))
                         .clickable(onClickLabel = "Open habit", onClick = onDetails),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    HabitGlyph(habit.icon, color)
+                    HabitGlyph(habit.icon, swatch)
                     Column(Modifier.weight(1f)) {
                         Text(habit.name, style = MaterialTheme.typography.titleMedium,
                             maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -239,9 +237,9 @@ private fun HabitCard(
                         else -> "${habit.name}. ${state.label}. Open today’s entry."
                     }
                     Box(
-                        Modifier.size(48.dp).clip(CircleShape)
-                            .background(if (done) color else color.copy(alpha = 0.10f))
-                            .border(1.dp, color.copy(alpha = if (canCheck || done) 0.57f else 0.27f), CircleShape)
+                        Modifier.size(48.dp).clip(checkShape)
+                            .background(if (done) lerp(Ink.panel, swatch, 0.18f) else Ink.panel)
+                            .border(1.dp, if (done) lerp(Ink.border, color, 0.65f) else Ink.border, checkShape)
                             .semantics { contentDescription = description }
                             .combinedClickable(
                                 role = Role.Button,
@@ -260,9 +258,9 @@ private fun HabitCard(
                             )
                             canCheck || done -> Icon(
                                 Icons.Outlined.Check, null, Modifier.size(22.dp),
-                                tint = if (done) Ink.background else color,
+                                tint = color,
                             )
-                            else -> Icon(Icons.Outlined.MoreHoriz, null, Modifier.size(20.dp), tint = color)
+                            else -> Icon(Icons.Outlined.MoreHoriz, null, Modifier.size(20.dp), tint = Ink.dim)
                         }
                     }
                     DropdownMenu(menu, onDismissRequest = { menu = false }) {
@@ -302,7 +300,7 @@ private fun HabitCard(
                     SmallMetric(Icons.AutoMirrored.Outlined.StickyNote2, "Note")
                 }
             }
-            Heatmap(now, { day -> habitCell(history.dayState(day, now), color) }, { day ->
+            Heatmap(now, { day -> habitCell(history.dayState(day, now), chartColor, colors) }, { day ->
                 if (history.isActive(day)) onEntry(day)
             }, compact = true)
         }

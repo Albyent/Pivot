@@ -115,7 +115,7 @@ internal fun HabitEditor(
         parsedQuick != null && parsedQuick in 0.01..1_000_000.0
     val validSchedule = mode != 1 || weekdays != 0
     if (pickingIcon) {
-        IconPicker(HabitIcon.fromId(icon), HabitColor.fromId(color).tint, onClose = { pickingIcon = false }) {
+        IconPicker(HabitIcon.fromId(icon), habitInk(HabitColor.fromId(color).tint), onClose = { pickingIcon = false }) {
             icon = it.id
         }
         return
@@ -150,9 +150,9 @@ internal fun HabitEditor(
         if (mode == 2) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically) {
-                CircleAction(Icons.Outlined.Remove, "Decrease weekly target", { weekly = (weekly - 1).coerceAtLeast(1) })
+                ToolbarAction(Icons.Outlined.Remove, "Decrease weekly target", { weekly = (weekly - 1).coerceAtLeast(1) })
                 Text("$weekly days per week", style = MaterialTheme.typography.titleSmall)
-                CircleAction(Icons.Outlined.Add, "Increase weekly target", { weekly = (weekly + 1).coerceAtMost(7) })
+                ToolbarAction(Icons.Outlined.Add, "Increase weekly target", { weekly = (weekly + 1).coerceAtMost(7) })
             }
         }
         if (habit == null) {

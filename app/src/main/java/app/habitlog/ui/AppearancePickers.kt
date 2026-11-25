@@ -21,7 +21,6 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.ChevronRight
@@ -79,7 +78,7 @@ internal fun HabitAppearanceControls(
             keyboard?.hide()
             onPickIcon()
         }) {
-            Icon(icon.glyph, null, Modifier.size(22.dp), tint = color.tint)
+            Icon(icon.glyph, null, Modifier.size(22.dp), tint = habitInk(color.tint))
         }
     }
     if (choosingColor) {
@@ -101,7 +100,7 @@ private fun AppearanceOption(
     Surface(
         onClick = onClick,
         modifier = modifier,
-        shape = RoundedCornerShape(13.dp),
+        shape = MaterialTheme.shapes.small,
         color = Ink.recessed,
         border = BorderStroke(1.dp, Ink.border),
     ) {
@@ -133,7 +132,7 @@ private fun ColorPicker(selected: HabitColor, onClose: () -> Unit, onColor: (Hab
                 val active = selected == color
                 ChoiceTile(color.label, active, color.tint, { onColor(color) }) {
                     Box(Modifier.size(28.dp).background(color.tint, CircleShape), contentAlignment = Alignment.Center) {
-                        if (active) Icon(Icons.Outlined.Check, null, Modifier.size(17.dp), tint = Ink.background)
+                        if (active) Icon(Icons.Outlined.Check, null, Modifier.size(17.dp), tint = Color(0xFF171717))
                     }
                 }
             }
@@ -208,7 +207,7 @@ private fun ChoiceTile(
     onClick: () -> Unit,
     content: @Composable () -> Unit,
 ) {
-    val shape = RoundedCornerShape(11.dp)
+    val shape = MaterialTheme.shapes.small
     Box(
         Modifier.fillMaxWidth().height(48.dp).clip(shape)
             .background(if (selected) accent.copy(alpha = 0.12f) else Ink.recessed)
@@ -226,7 +225,7 @@ internal fun PickerDialog(title: String, onClose: () -> Unit, content: @Composab
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(
             modifier = Modifier.padding(horizontal = 16.dp).widthIn(max = 440.dp).fillMaxWidth(),
-            shape = RoundedCornerShape(21.dp),
+            shape = MaterialTheme.shapes.large,
             color = Ink.panel,
             border = BorderStroke(1.dp, Ink.border),
         ) {

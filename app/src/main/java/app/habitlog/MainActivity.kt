@@ -10,10 +10,14 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewModelScope
@@ -21,9 +25,13 @@ import app.habitlog.data.LocalBackup
 import app.habitlog.data.LogRepository
 import app.habitlog.data.LogSnapshot
 import app.habitlog.model.AppAccent
+import app.habitlog.model.AppAppearance
+import app.habitlog.model.ThemeMode
+import app.habitlog.model.isSystemDark
 import app.habitlog.model.today
 import app.habitlog.system.DeviceFeatures
 import app.habitlog.ui.PivotApp
+import app.habitlog.ui.PivotTheme
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -36,13 +44,23 @@ import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private lateinit var model: LogViewModel
+    private var darkChrome = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge(SystemBarStyle.dark(Color.TRANSPARENT), SystemBarStyle.dark(Color.TRANSPARENT))
+        val transparent = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT)
+        enableEdgeToEdge(transparent, transparent)
         model = ViewModelProvider(this)[LogViewModel::class.java]
+        setBarIcons(model.appearance.value.mode.isDark(isSystemDark()))
         if (savedInstanceState == null) openFromIntent(intent)
-        setContent { PivotApp(model) }
+        setContent {
+            val appearance by model.appearance.collectAsStateWithLifecycle()
+            val dark = appearance.mode.isDark(isSystemInDarkTheme())
+            SideEffect { setBarIcons(dark) }
+            PivotTheme(dark, appearance.accent) {
+                PivotApp(model, appearance, dark)
+            }
+        }
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 while (true) {
@@ -63,11 +81,14 @@ class MainActivity : ComponentActivity() {
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
-        if (hasFocus) {
-            WindowCompat.getInsetsController(window, window.decorView).apply {
-                isAppearanceLightStatusBars = false
-                isAppearanceLightNavigationBars = false
-            }
+        if (hasFocus) setBarIcons(darkChrome)
+    }
+
+    private fun setBarIcons(dark: Boolean) {
+        darkChrome = dark
+        WindowCompat.getInsetsController(window, window.decorView).apply {
+            isAppearanceLightStatusBars = !dark
+            isAppearanceLightNavigationBars = !dark
         }
     }
 
@@ -93,8 +114,8 @@ class LogViewModel(private val application: Application) : AndroidViewModel(appl
     private val repository = LogRepository(application)
     val state = repository.snapshots.stateIn(viewModelScope, SharingStarted.Eagerly, null)
     val now = MutableStateFlow(today())
-    private val selectedAccent = MutableStateFlow(AppAccent.load(application))
-    val accent = selectedAccent.asStateFlow()
+    private val selectedAppearance = MutableStateFlow(AppAppearance.load(application))
+    val appearance = selectedAppearance.asStateFlow()
     val requestedHabit = MutableStateFlow<Long?>(null)
     val pendingBackup = MutableStateFlow<LogSnapshot?>(null)
     private val messageChannel = Channel<Feedback>(Channel.BUFFERED)
@@ -138,10 +159,14 @@ class LogViewModel(private val application: Application) : AndroidViewModel(appl
         write("Backup restored") { restore(snapshot) }
     }
 
-    fun selectAccent(accent: AppAccent) {
-        if (selectedAccent.value == accent) return
-        accent.save(application)
-        selectedAccent.value = accent
+    fun selectMode(mode: ThemeMode) = updateAppearance(appearance.value.copy(mode = mode))
+
+    fun selectAccent(accent: AppAccent) = updateAppearance(appearance.value.copy(accent = accent))
+
+    private fun updateAppearance(appearance: AppAppearance) {
+        if (selectedAppearance.value == appearance) return
+        appearance.save(application)
+        selectedAppearance.value = appearance
         refreshDevice()
     }
 

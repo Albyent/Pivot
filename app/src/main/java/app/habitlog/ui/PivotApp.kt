@@ -7,7 +7,6 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Settings
-import android.view.ContextThemeWrapper
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -20,11 +19,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.selectable
@@ -64,7 +65,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -73,6 +73,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.habitlog.LogViewModel
+import app.habitlog.model.AppAppearance
 import app.habitlog.model.DayState
 import app.habitlog.model.HabitColor
 import app.habitlog.model.HabitHistory
@@ -102,15 +103,15 @@ private sealed interface Confirm {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PivotApp(model: LogViewModel) {
+internal fun PivotApp(model: LogViewModel, appearance: AppAppearance, dark: Boolean) {
     val snapshot by model.state.collectAsStateWithLifecycle()
     val now by model.now.collectAsStateWithLifecycle()
     val requested by model.requestedHabit.collectAsStateWithLifecycle()
     val pendingBackup by model.pendingBackup.collectAsStateWithLifecycle()
-    val accent by model.accent.collectAsStateWithLifecycle()
+    val accent = appearance.accent
     val data = snapshot
     val context = LocalContext.current
-    val pickerContext = remember(context, accent) { ContextThemeWrapper(context, accent.pickerStyle) }
+    val pickerContext = remember(context, dark, accent) { context.pickerTheme(dark, accent) }
     var tab by rememberSaveable { mutableStateOf(Tab.Dashboard) }
     var selectedHabit by rememberSaveable { mutableStateOf<Long?>(null) }
     var settings by rememberSaveable { mutableStateOf(false) }
@@ -170,200 +171,201 @@ fun PivotApp(model: LogViewModel) {
         if (granted) model.refreshDevice() else model.message("Enable notifications in Android settings for reminders.")
     }
 
-    PivotTheme(accent) {
-        Scaffold(
-            containerColor = Ink.background,
-            contentWindowInsets = WindowInsets(0, 0, 0, 0),
-            topBar = {
-                val title = detail?.habit?.name ?: when {
-                    settings -> "Settings"
-                    tab == Tab.Dashboard -> "Pivot"
-                    else -> tab.label
+    Scaffold(
+        containerColor = Ink.background,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        topBar = {
+            val title = detail?.habit?.name ?: when {
+                settings -> "Settings"
+                tab == Tab.Dashboard -> "Pivot"
+                else -> tab.label
+            }
+            AppHeader(
+                title = title,
+                subtitle = if (detail == null && !settings && tab == Tab.Dashboard) dayLabel(now, "EEEE, MMM d") else null,
+                onBack = if (selectedHabit != null || settings) ({ goBack() }) else null,
+            ) {
+                if (detail != null && detail.habit.archivedDay == null) {
+                    val id = detail.habit.id
+                    val active = data.histories.filter { it.habit.archivedDay == null }
+                    val position = active.indexOf(detail)
+                    HabitMenu(
+                        detail, now, position > 0, position < active.lastIndex,
+                        onEdit = { sheet = Sheet.HabitForm(id) },
+                        onPause = { pauseHabit(id) },
+                        onResume = { resumeHabit(id) },
+                        onSkip = { setSkip(id, it) },
+                        onMove = { delta -> model.write { moveHabit(id, delta) } },
+                        onArchive = { confirm = Confirm.Archive(id, detail.habit.name) },
+                    )
+                } else if (detail == null && !settings) {
+                    ToolbarAction(Icons.Outlined.Settings, "Settings", { settings = true })
                 }
-                AppHeader(
-                    title = title,
-                    subtitle = if (detail == null && !settings && tab == Tab.Dashboard) dayLabel(now, "EEEE, MMM d") else null,
-                    onBack = if (selectedHabit != null || settings) ({ goBack() }) else null,
-                ) {
-                    if (detail != null && detail.habit.archivedDay == null) {
+            }
+        },
+        bottomBar = {
+            if (selectedHabit != null || settings) {
+                Spacer(Modifier.navigationBarsPadding())
+            } else {
+                BottomNavigation(tab) { tab = it }
+            }
+        },
+        snackbarHost = { SnackbarHost(snackbar) },
+    ) { padding ->
+        Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.TopCenter) {
+            Box(Modifier.widthIn(max = 620.dp).fillMaxSize()) {
+                when {
+                    data == null -> CircularProgressIndicator(Modifier.align(Alignment.Center))
+                    detail != null -> {
                         val id = detail.habit.id
-                        val active = data.histories.filter { it.habit.archivedDay == null }
-                        val position = active.indexOf(detail)
-                        HabitMenu(
-                            detail, now, position > 0, position < active.lastIndex,
-                            onEdit = { sheet = Sheet.HabitForm(id) },
-                            onPause = { pauseHabit(id) },
-                            onResume = { resumeHabit(id) },
-                            onSkip = { setSkip(id, it) },
-                            onMove = { delta -> model.write { moveHabit(id, delta) } },
-                            onArchive = { confirm = Confirm.Archive(id, detail.habit.name) },
-                        )
-                    } else if (detail == null && !settings) {
-                        CircleAction(Icons.Outlined.Settings, "Settings", { settings = true })
-                    }
-                }
-            },
-            bottomBar = {
-                if (selectedHabit != null || settings) {
-                    Spacer(Modifier.navigationBarsPadding())
-                } else {
-                    BottomNavigation(tab) { tab = it }
-                }
-            },
-            snackbarHost = { SnackbarHost(snackbar) },
-        ) { padding ->
-            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.TopCenter) {
-                Box(Modifier.widthIn(max = 620.dp).fillMaxSize()) {
-                    when {
-                        data == null -> CircularProgressIndicator(Modifier.align(Alignment.Center))
-                        detail != null -> {
-                            val id = detail.habit.id
-                            val archived = detail.habit.archivedDay
-                            val pause = detail.pauseOn(now)
-                            val contextLine = when {
-                                archived != null -> "Archived " + dayLabel(archived)
-                                pause != null -> "Paused through " + dayLabel(pause.lastDay)
-                                else -> scheduleLabel(detail.scheduleAt(now))
+                        val archived = detail.habit.archivedDay
+                        val pause = detail.pauseOn(now)
+                        val contextLine = when {
+                            archived != null -> "Archived " + dayLabel(archived)
+                            pause != null -> "Paused through " + dayLabel(pause.lastDay)
+                            else -> scheduleLabel(detail.scheduleAt(now))
+                        }
+                        HabitDetails(detail, now, contextLine, { openEntry(id, it) }, {
+                            val latest = minOf(now, archived ?: now)
+                            if (latest >= detail.habit.startDay) {
+                                chooseDate(pickerContext, latest, detail.habit.startDay, latest) { openEntry(id, it) }
                             }
-                            HabitDetails(detail, now, contextLine, { openEntry(id, it) }, {
-                                val latest = minOf(now, archived ?: now)
-                                if (latest >= detail.habit.startDay) {
-                                    chooseDate(pickerContext, latest, detail.habit.startDay, latest) { openEntry(id, it) }
-                                }
-                            })
-                        }
-                        settings -> SettingsScreen(
-                            data,
-                            accent.label,
-                            onTheme = { showingThemePicker = true },
-                            onExport = { exportFile.launch("pivot-backup-${now.asDate()}.json") },
-                            onRestore = { importFile.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) },
-                            onWidget = {
-                                val manager = AppWidgetManager.getInstance(context)
-                                if (manager.isRequestPinAppWidgetSupported) {
-                                    manager.requestPinAppWidget(ComponentName(context, HabitWidget::class.java), null, null)
-                                } else {
-                                    model.message("Touch and hold your home screen, then choose Widgets → Pivot.")
-                                }
-                            },
-                            onNotifications = {
-                                context.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
-                                    .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName))
-                            },
-                            onArchived = { selectedHabit = it },
-                        )
-                        tab == Tab.Insights -> Insights(data, now, ::openEntry)
-                        tab == Tab.Tasks -> TasksScreen(
-                            data.tasks, now, { sheet = Sheet.TaskForm(null) }, { sheet = Sheet.TaskForm(it) },
-                            { id -> model.write { toggleTask(id) } },
-                        )
-                        else -> Dashboard(
-                            data, now, dashboardScroll, todayOnly,
-                            { todayOnly = !todayOnly }, { sheet = Sheet.HabitForm(null) }, { selectedHabit = it },
-                            { sheet = Sheet.Activity(it) }, ::openEntry,
-                            { history -> model.checkIn(history.habit.id, history.habit.name, now) },
-                            { id -> model.write("Check-in cleared") { undoCheckIn(id, now) } },
-                            { id, skip -> setSkip(id, skip) },
-                            ::pauseHabit, { resumeHabit(it) },
-                        )
+                        })
                     }
-                }
-            }
-        }
-
-        val openSheet = sheet
-        if (openSheet != null && data != null) {
-            key(openSheet) {
-                ModalBottomSheet(
-                    onDismissRequest = { sheet = null },
-                    sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-                    containerColor = Ink.panel,
-                    scrimColor = Color(0xCC080D17),
-                ) {
-                    when (openSheet) {
-                        is Sheet.HabitForm -> {
-                            val history = data.histories.find { it.habit.id == openSheet.id }
-                            val palette = HabitColor.suggestedOrder
-                            val suggestedColor = palette[data.habits.size % palette.size].id
-                            HabitEditor(history, now, suggestedColor, pickerContext) { draft ->
-                                model.write { saveHabit(openSheet.id, draft) }
-                                sheet = null
-                                if (draft.reminderMinute != null && Build.VERSION.SDK_INT >= 33 &&
-                                    context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                                    notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                }
-                            }
-                        }
-                        is Sheet.TaskForm -> {
-                            val task = data.tasks.find { it.id == openSheet.id }
-                            TaskEditor(task, now, pickerContext, onSave = { name, date ->
-                                model.write { saveTask(openSheet.id, name, date) }
-                                sheet = null
-                            }, onDelete = {
-                                if (task != null) confirm = Confirm.DeleteTask(task.id, task.name)
-                            })
-                        }
-                        is Sheet.Entry -> {
-                            val history = data.histories.find { it.habit.id == openSheet.id }
-                            if (history != null && history.isActive(openSheet.day)) {
-                                EntryEditor(history, openSheet.day, now) { amount, skipped, note ->
-                                    model.write { saveCheckIn(openSheet.id, openSheet.day, amount, skipped, note) }
-                                    sheet = null
-                                }
+                    settings -> SettingsScreen(
+                        data,
+                        appearance.mode.label + " · " + accent.label,
+                        onTheme = { showingThemePicker = true },
+                        onExport = { exportFile.launch("pivot-backup-${now.asDate()}.json") },
+                        onRestore = { importFile.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) },
+                        onWidget = {
+                            val manager = AppWidgetManager.getInstance(context)
+                            if (manager.isRequestPinAppWidgetSupported) {
+                                manager.requestPinAppWidget(ComponentName(context, HabitWidget::class.java), null, null)
                             } else {
-                                EditorContent("Entry unavailable") { Text("Choose a date within this habit’s history.") }
+                                model.message("Touch and hold your home screen, then choose Widgets → Pivot.")
                             }
-                        }
-                        is Sheet.Activity -> DayOverview(data, openSheet.day, now, onPick = {
-                            chooseDate(pickerContext, openSheet.day, MIN_DAY, now) { sheet = Sheet.Activity(it) }
-                        }) { id -> openEntry(id, openSheet.day) }
-                    }
+                        },
+                        onNotifications = {
+                            context.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName))
+                        },
+                        onArchived = { selectedHabit = it },
+                    )
+                    tab == Tab.Insights -> Insights(data, now, ::openEntry)
+                    tab == Tab.Tasks -> TasksScreen(
+                        data.tasks, now, { sheet = Sheet.TaskForm(null) }, { sheet = Sheet.TaskForm(it) },
+                        { id -> model.write { toggleTask(id) } },
+                    )
+                    else -> Dashboard(
+                        data, now, dashboardScroll, todayOnly,
+                        { todayOnly = !todayOnly }, { sheet = Sheet.HabitForm(null) }, { selectedHabit = it },
+                        { sheet = Sheet.Activity(it) }, ::openEntry,
+                        { history -> model.checkIn(history.habit.id, history.habit.name, now) },
+                        { id -> model.write("Check-in cleared") { undoCheckIn(id, now) } },
+                        { id, skip -> setSkip(id, skip) },
+                        ::pauseHabit, { resumeHabit(it) },
+                    )
                 }
             }
         }
+    }
 
-        if (showingThemePicker) ThemePicker(accent, model::selectAccent) { showingThemePicker = false }
+    val openSheet = sheet
+    if (openSheet != null && data != null) {
+        key(openSheet) {
+            ModalBottomSheet(
+                onDismissRequest = { sheet = null },
+                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+                containerColor = Ink.panel,
+                shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+                scrimColor = MaterialTheme.colorScheme.scrim.copy(alpha = if (dark) 0.60f else 0.38f),
+            ) {
+                when (openSheet) {
+                    is Sheet.HabitForm -> {
+                        val history = data.histories.find { it.habit.id == openSheet.id }
+                        val palette = HabitColor.suggestedOrder
+                        val suggestedColor = palette[data.habits.size % palette.size].id
+                        HabitEditor(history, now, suggestedColor, pickerContext) { draft ->
+                            model.write { saveHabit(openSheet.id, draft) }
+                            sheet = null
+                            if (draft.reminderMinute != null && Build.VERSION.SDK_INT >= 33 &&
+                                context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                                notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            }
+                        }
+                    }
+                    is Sheet.TaskForm -> {
+                        val task = data.tasks.find { it.id == openSheet.id }
+                        TaskEditor(task, now, pickerContext, onSave = { name, date ->
+                            model.write { saveTask(openSheet.id, name, date) }
+                            sheet = null
+                        }, onDelete = {
+                            if (task != null) confirm = Confirm.DeleteTask(task.id, task.name)
+                        })
+                    }
+                    is Sheet.Entry -> {
+                        val history = data.histories.find { it.habit.id == openSheet.id }
+                        if (history != null && history.isActive(openSheet.day)) {
+                            EntryEditor(history, openSheet.day, now) { amount, skipped, note ->
+                                model.write { saveCheckIn(openSheet.id, openSheet.day, amount, skipped, note) }
+                                sheet = null
+                            }
+                        } else {
+                            EditorContent("Entry unavailable") { Text("Choose a date within this habit’s history.") }
+                        }
+                    }
+                    is Sheet.Activity -> DayOverview(data, openSheet.day, now, onPick = {
+                        chooseDate(pickerContext, openSheet.day, MIN_DAY, now) { sheet = Sheet.Activity(it) }
+                    }) { id -> openEntry(id, openSheet.day) }
+                }
+            }
+        }
+    }
 
-        confirm?.let { action ->
-            val title: String
-            val message: String
-            val button: String
+    if (showingThemePicker) {
+        ThemePicker(appearance, dark, model::selectMode, model::selectAccent) { showingThemePicker = false }
+    }
+
+    confirm?.let { action ->
+        val title: String
+        val message: String
+        val button: String
+        when (action) {
+            is Confirm.Archive -> {
+                title = "Archive habit?"
+                message = "${action.name} will move to Archived habits in Settings."
+                button = "Archive"
+            }
+            is Confirm.DeleteTask -> {
+                title = "Delete task?"
+                message = "Remove ${action.name} from Tasks."
+                button = "Delete"
+            }
+        }
+        ConfirmDialog(title, message, button, onDismiss = { confirm = null }) {
+            confirm = null
             when (action) {
                 is Confirm.Archive -> {
-                    title = "Archive habit?"
-                    message = "${action.name} will move to Archived habits in Settings."
-                    button = "Archive"
+                    model.write("Habit archived") { archiveHabit(action.id) }
+                    selectedHabit = null
                 }
                 is Confirm.DeleteTask -> {
-                    title = "Delete task?"
-                    message = "Remove ${action.name} from Tasks."
-                    button = "Delete"
-                }
-            }
-            ConfirmDialog(title, message, button, onDismiss = { confirm = null }) {
-                confirm = null
-                when (action) {
-                    is Confirm.Archive -> {
-                        model.write("Habit archived") { archiveHabit(action.id) }
-                        selectedHabit = null
-                    }
-                    is Confirm.DeleteTask -> {
-                        model.write("Task deleted") { deleteTask(action.id) }
-                        sheet = null
-                    }
+                    model.write("Task deleted") { deleteTask(action.id) }
+                    sheet = null
                 }
             }
         }
-        pendingBackup?.let { backup ->
-            ConfirmDialog(
-                "Restore this backup?",
-                "This replaces your current data with ${backup.habits.size} habits and ${backup.tasks.size} tasks from the file.",
-                "Restore",
-                onDismiss = { model.pendingBackup.value = null },
-            ) {
-                selectedHabit = null
-                model.restore()
-            }
+    }
+    pendingBackup?.let { backup ->
+        ConfirmDialog(
+            "Restore this backup?",
+            "This replaces your current data with ${backup.habits.size} habits and ${backup.tasks.size} tasks from the file.",
+            "Restore",
+            onDismiss = { model.pendingBackup.value = null },
+        ) {
+            selectedHabit = null
+            model.restore()
         }
     }
 }
@@ -377,12 +379,12 @@ private fun AppHeader(
 ) {
     Box(Modifier.fillMaxWidth().background(Ink.background).statusBarsPadding(), contentAlignment = Alignment.Center) {
         Row(
-            Modifier.widthIn(max = 620.dp).fillMaxWidth().heightIn(min = 66.dp)
+            Modifier.widthIn(max = 620.dp).fillMaxWidth().heightIn(min = 60.dp)
                 .padding(start = 18.dp, end = 18.dp, top = 9.dp, bottom = 9.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            if (onBack != null) CircleAction(Icons.AutoMirrored.Outlined.ArrowBack, "Back", onBack)
+            if (onBack != null) ToolbarAction(Icons.AutoMirrored.Outlined.ArrowBack, "Back", onBack)
             Column(Modifier.weight(1f)) {
                 Text(title, style = MaterialTheme.typography.headlineMedium,
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -395,25 +397,22 @@ private fun AppHeader(
 
 @Composable
 private fun BottomNavigation(current: Tab, onTab: (Tab) -> Unit) {
-    Column(Modifier.fillMaxWidth().background(Color(0xFF151D2B))) {
+    Column(Modifier.fillMaxWidth().background(Ink.panel)) {
         HorizontalDivider(color = Ink.border)
         Box(Modifier.fillMaxWidth().navigationBarsPadding(), contentAlignment = Alignment.Center) {
-            Row(Modifier.widthIn(max = 620.dp).fillMaxWidth().selectableGroup().padding(horizontal = 12.dp, vertical = 5.dp)) {
+            Row(Modifier.widthIn(max = 620.dp).fillMaxWidth().selectableGroup().padding(horizontal = 12.dp)) {
                 Tab.entries.forEach { tab ->
                     val active = current == tab
                     Column(
-                        Modifier.weight(1f).clip(RoundedCornerShape(12.dp))
+                        Modifier.weight(1f)
                             .selectable(active, role = Role.Tab, onClick = { onTab(tab) })
-                            .heightIn(min = 52.dp).padding(vertical = 4.dp),
+                            .heightIn(min = 54.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
                     ) {
-                        Box(Modifier.size(42.dp, 26.dp).background(
-                            if (active) Ink.selectedSurface else Color.Transparent, RoundedCornerShape(8.dp)),
-                            contentAlignment = Alignment.Center) {
-                            Icon(tab.icon, null, Modifier.size(19.dp), tint = if (active) Ink.primary else Ink.muted)
-                        }
-                        Text(tab.label, color = if (active) Ink.primary else Ink.muted, style = MaterialTheme.typography.labelSmall)
+                        val tint = if (active) Ink.primary else Ink.dim
+                        Box(Modifier.width(24.dp).height(2.dp).background(if (active) tint else Color.Transparent))
+                        Icon(tab.icon, null, Modifier.padding(top = 7.dp, bottom = 3.dp).size(19.dp), tint = tint)
+                        Text(tab.label, color = tint, style = MaterialTheme.typography.labelMedium)
                     }
                 }
             }
@@ -438,7 +437,7 @@ private fun HabitMenu(
     val paused = history.pauseOn(now) != null
     val state = history.dayState(now, now)
     Box {
-        CircleAction(Icons.Outlined.MoreVert, "Habit options", { expanded = true })
+        ToolbarAction(Icons.Outlined.MoreVert, "Habit options", { expanded = true })
         DropdownMenu(expanded, onDismissRequest = { expanded = false }) {
             DropdownMenuItem(text = { Text("Edit habit") }, onClick = { expanded = false; onEdit() })
             if (!paused && history.isScheduled(now) && state != DayState.DONE) {

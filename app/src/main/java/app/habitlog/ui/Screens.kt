@@ -73,7 +73,9 @@ internal fun HabitDetails(
     onDatePicker: () -> Unit,
 ) {
     val habit = history.habit
-    val accent = HabitColor.fromId(habit.color).tint
+    val swatch = HabitColor.fromId(habit.color).tint
+    val colors = MaterialTheme.colorScheme
+    val chartColor = colors.habitGraphColor(swatch)
     val streak = remember(history, now) { history.streaks(now) }
     var range by rememberSaveable(habit.id) { mutableIntStateOf(30) }
     var notesOnly by rememberSaveable(habit.id) { mutableStateOf(false) }
@@ -90,11 +92,11 @@ internal fun HabitDetails(
             Panel {
                 Column(Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                        HabitGlyph(habit.icon, accent)
+                        HabitGlyph(habit.icon, swatch)
                         Text(contextLine, Modifier.weight(1f), color = Ink.muted, style = MaterialTheme.typography.bodyMedium)
                         ActionPill("Pick date", onDatePicker, icon = Icons.Outlined.CalendarToday)
                     }
-                    Heatmap(now, { day -> habitCell(history.dayState(day, now), accent) }, { day ->
+                    Heatmap(now, { day -> habitCell(history.dayState(day, now), chartColor, colors) }, { day ->
                         if (history.isActive(day)) onDate(day)
                     })
                     val next = history.schedules.firstOrNull { it.effectiveDay > now }

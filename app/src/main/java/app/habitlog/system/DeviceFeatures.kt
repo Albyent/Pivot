@@ -23,7 +23,9 @@ import app.habitlog.MainActivity
 import app.habitlog.R
 import app.habitlog.data.LogRepository
 import app.habitlog.data.LogSnapshot
-import app.habitlog.model.AppAccent
+import app.habitlog.model.AppAppearance
+import app.habitlog.model.appearanceContext
+import app.habitlog.model.isSystemDark
 import app.habitlog.model.DayState
 import app.habitlog.model.HabitHistory
 import app.habitlog.model.amountLabel
@@ -112,11 +114,20 @@ object DeviceFeatures {
         val rowIds = intArrayOf(R.id.widget_row_1, R.id.widget_row_2, R.id.widget_row_3)
         val names = intArrayOf(R.id.widget_name_1, R.id.widget_name_2, R.id.widget_name_3)
         val checks = intArrayOf(R.id.widget_check_1, R.id.widget_check_2, R.id.widget_check_3)
-        val accent = context.getColor(AppAccent.load(context).colorRes)
+        val appearance = AppAppearance.load(context)
+        val dark = appearance.mode.isDark(context.isSystemDark())
+        val theme = context.appearanceContext(dark)
+        val accent = theme.getColor(appearance.accent.colorRes)
+        val foreground = theme.getColor(R.color.pivot_text)
+        val muted = theme.getColor(R.color.pivot_muted)
         val active = snapshot.histories.filter { it.habit.archivedDay == null }
         val visible = (active.filter { it.isDue(date) } +
             active.filter { it.dayState(date, date) == DayState.DONE }).take(rowIds.size)
         val views = RemoteViews(context.packageName, R.layout.habit_widget)
+        views.setInt(R.id.widget_container, "setBackgroundResource",
+            if (dark) R.drawable.widget_surface else R.drawable.widget_surface_light)
+        views.setTextColor(R.id.widget_title, foreground)
+        views.setTextColor(R.id.widget_empty, muted)
         views.setOnClickPendingIntent(R.id.widget_title, openApp(context, null))
         views.setViewVisibility(R.id.widget_empty, if (visible.isEmpty()) View.VISIBLE else View.GONE)
         for (index in rowIds.indices) {
@@ -132,6 +143,9 @@ object DeviceFeatures {
                 else -> "○"
             }
             views.setTextViewText(names[index], habit.name)
+            views.setTextColor(names[index], foreground)
+            views.setInt(checks[index], "setBackgroundResource",
+                if (dark) R.drawable.widget_check else R.drawable.widget_check_light)
             views.setOnClickPendingIntent(names[index], openApp(context, habit.id))
             views.setTextViewText(checks[index], label)
             views.setTextColor(checks[index], accent)

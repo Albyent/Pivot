@@ -1,11 +1,19 @@
 <resources>
-    <style name="Theme.HabitLog" parent="android:style/Theme.Material.NoActionBar">
-        <item name="android:fontFamily">sans</item>
-        <item name="android:windowBackground">#101520</item>
-        <item name="android:colorAccent">@color/accent_lilac</item>
+    <style name="Theme.HabitLog.Light" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/pivot_background</item>
+        <item name="android:colorAccent">@color/accent_slate</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowActionModeOverlay">true</item>
+    </style>
+    <style name="Theme.HabitLog.Dark" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/pivot_background</item>
+        <item name="android:colorAccent">@color/accent_slate</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowActionModeOverlay">true</item>
     </style>
+    <style name="Theme.HabitLog" parent="Theme.HabitLog.Light" />
 </resources>

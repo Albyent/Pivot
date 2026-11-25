@@ -1,13 +1,4 @@
 <resources>
-    <color name="accent_lilac">#BAB0FF</color>
-    <color name="accent_ocean">#85BBFF</color>
-    <color name="accent_teal">#63D9CF</color>
-    <color name="accent_forest">#A1D686</color>
-    <color name="accent_amber">#F5CD78</color>
-    <color name="accent_coral">#FF9D88</color>
-    <color name="accent_rose">#F5A7D1</color>
-    <color name="accent_slate">#C5D0DF</color>
-
     <style name="ThemeOverlay.Pivot.Lilac" parent="">
         <item name="android:colorAccent">@color/accent_lilac</item>
     </style>

@@ -1,0 +1,20 @@
+<resources>
+    <color name="pivot_background">#131313</color>
+    <color name="pivot_surface">#1B1B1B</color>
+    <color name="pivot_field">#252525</color>
+    <color name="pivot_raised">#2C2C2C</color>
+    <color name="pivot_divider">#363636</color>
+    <color name="pivot_text">#F2F2F2</color>
+    <color name="pivot_muted">#B5B5B5</color>
+    <color name="pivot_outline">#969696</color>
+    <color name="pivot_error">#F3A0A2</color>
+
+    <color name="accent_lilac">#C2B1EF</color>
+    <color name="accent_ocean">#91BCE4</color>
+    <color name="accent_teal">#82C9BF</color>
+    <color name="accent_forest">#ADD09F</color>
+    <color name="accent_amber">#E2C18A</color>
+    <color name="accent_coral">#E4A997</color>
+    <color name="accent_rose">#E6ADCA</color>
+    <color name="accent_slate">#CDCDCD</color>
+</resources>

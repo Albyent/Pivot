@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,6 +27,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
@@ -40,27 +42,30 @@ import kotlin.math.roundToInt
 
 internal data class Cell(val color: Color, val skipped: Boolean = false, val outlined: Boolean = false)
 
-internal fun habitCell(state: DayState, color: Color): Cell = when (state) {
-    DayState.DONE -> Cell(lerp(Ink.panel, color, 0.88f))
-    DayState.PARTIAL -> Cell(lerp(Ink.panel, color, 0.47f))
-    DayState.MISSED -> Cell(Color(0xFF344258))
-    DayState.PENDING -> Cell(Color(0xFF28364C), outlined = true)
-    DayState.SKIPPED -> Cell(Color(0xFF2D3B51), skipped = true)
-    DayState.UNLOGGED -> Cell(Color(0xFF29364A))
-    DayState.REST -> Cell(Color(0xFF222E41))
-    DayState.INACTIVE, DayState.FUTURE -> Cell(Color(0xFF202B3C))
+internal fun ColorScheme.habitGraphColor(swatch: Color): Color =
+    if (background.luminance() < 0.5f) swatch else lerp(swatch, onSurface, 0.28f)
+
+internal fun habitCell(state: DayState, color: Color, colors: ColorScheme): Cell = when (state) {
+    DayState.DONE -> Cell(lerp(colors.surface, color, 0.87f))
+    DayState.PARTIAL -> Cell(lerp(colors.surfaceVariant, color, 0.47f))
+    DayState.MISSED -> Cell(lerp(colors.surfaceVariant, colors.outline, 0.35f))
+    DayState.PENDING -> Cell(colors.surfaceVariant, outlined = true)
+    DayState.SKIPPED -> Cell(lerp(colors.surfaceVariant, colors.outline, 0.16f), skipped = true)
+    DayState.UNLOGGED -> Cell(lerp(colors.surfaceVariant, colors.outline, 0.13f))
+    DayState.REST -> Cell(colors.surfaceVariant)
+    DayState.INACTIVE, DayState.FUTURE -> Cell(lerp(colors.surface, colors.surfaceVariant, 0.54f))
 }
 
-internal fun activityCell(count: Int, day: Long, now: Long, accent: Color): Cell {
-    if (day > now) return Cell(Color(0xFF202B3C))
+internal fun activityCell(count: Int, day: Long, now: Long, accent: Color, colors: ColorScheme): Cell {
+    if (day > now) return Cell(lerp(colors.surface, colors.surfaceVariant, 0.54f))
     val level = when (count) {
         0 -> 0f
-        1 -> 0.43f
-        2 -> 0.62f
-        3 -> 0.80f
+        1 -> 0.39f
+        2 -> 0.60f
+        3 -> 0.81f
         else -> 1f
     }
-    return Cell(lerp(Color(0xFF2A364C), accent, level), outlined = day == now)
+    return Cell(lerp(colors.surfaceVariant, accent, level), outlined = day == now)
 }
 
 @Composable
@@ -72,7 +77,8 @@ internal fun Heatmap(
     compact: Boolean = false,
     onVisibleDates: ((Long, Long) -> Unit)? = null,
 ) {
-    val outlineColor = Ink.primary.copy(alpha = 0.75f)
+    val outlineColor = Ink.primary.copy(alpha = 0.8f)
+    val skipColor = Ink.dim
     val lastWeek = weekStart(now)
     val columns = 53
     val first = lastWeek - (columns - 1) * 7
@@ -100,7 +106,7 @@ internal fun Heatmap(
         val density = LocalDensity.current
         val columnPx = with(density) { pitch.toPx() }
         val rowPx = with(density) { rowPitch.toPx() }
-        val radius = with(density) { 3.dp.toPx() }
+        val radius = with(density) { 2.dp.toPx() }
         val gap = with(density) { 3.dp.toPx() }
         val fullWidth = pitch * columns
         LaunchedEffect(first, now, maxWidth) {
@@ -151,7 +157,7 @@ internal fun Heatmap(
                             drawRoundRect(outlineColor, point, square, corners, style = Stroke(1.2.dp.toPx()))
                         }
                         if (mark.skipped) {
-                            drawLine(Ink.dim, Offset(x + tile * 0.31f, y + tile * 0.69f),
+                            drawLine(skipColor, Offset(x + tile * 0.31f, y + tile * 0.69f),
                                 Offset(x + tile * 0.69f, y + tile * 0.31f), strokeWidth = 1.dp.toPx())
                         }
                     }
